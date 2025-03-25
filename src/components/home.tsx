@@ -5,6 +5,7 @@ import ChatInterface from "./ChatInterface";
 import EnhanceButton from "./EnhanceButton";
 import ResultsDisplay from "./ResultsDisplay";
 import LoadingIndicator from "./LoadingIndicator";
+import ApiCredentialsForm from "./ApiCredentialsForm";
 
 interface Message {
   id: string;
@@ -21,13 +22,17 @@ const Home = () => {
     {
       id: "1",
       content:
-        "Hello! Upload an image and tell me how you'd like to enhance it.",
+        "Hello! Upload an image, enter your Azure Computer Vision credentials, and tell me how you'd like to enhance it. I'll help you remove the background.",
       sender: "ai",
       timestamp: new Date(),
     },
   ]);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [showResults, setShowResults] = useState<boolean>(false);
+  const [apiKey, setApiKey] = useState<string>("");
+  const [location, setLocation] = useState<string>("");
+  const [endpoint, setEndpoint] = useState<string>("");
+  const [error, setError] = useState<string>("");
 
   const handleImageUpload = (file: File) => {
     setUploadedImage(file);
@@ -37,6 +42,7 @@ const Home = () => {
     // Reset enhanced image and results when a new image is uploaded
     setEnhancedImageUrl("");
     setShowResults(false);
+    setError("");
   };
 
   const handleSendMessage = (message: string) => {
@@ -54,7 +60,7 @@ const Home = () => {
       const aiResponse: Message = {
         id: (Date.now() + 1).toString(),
         content:
-          "I understand what you want to do with your image. Click the 'Enhance Image' button when you're ready to proceed.",
+          "I understand what you want to do with your image. Click the 'Enhance Image' button when you're ready to remove the background.",
         sender: "ai",
         timestamp: new Date(),
       };
@@ -62,16 +68,44 @@ const Home = () => {
     }, 1000);
   };
 
-  const handleEnhanceImage = () => {
+  const handleEnhanceImage = async () => {
     if (!uploadedImage) return;
+    if (!apiKey || !location || !endpoint) {
+      setError("Please provide all Azure Computer Vision credentials");
+      return;
+    }
 
     setIsProcessing(true);
+    setError("");
 
-    // Simulate image processing
-    setTimeout(() => {
-      // For demo purposes, we're just using the same image
-      // In a real app, this would be the result from the AI enhancement
-      setEnhancedImageUrl(uploadedImageUrl);
+    try {
+      // Convert the image to base64
+      const base64Image = await fileToBase64(uploadedImage);
+      const imageData = base64Image.split(",")[1]; // Remove the data URL prefix
+
+      // Call Azure Computer Vision API for background removal
+      const response = await fetch(
+        `${endpoint}/computervision/imageanalysis:segment?api-version=2023-02-01-preview&mode=backgroundRemoval`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/octet-stream",
+            "Ocp-Apim-Subscription-Key": apiKey,
+            "Ocp-Apim-Subscription-Region": location,
+          },
+          body: uploadedImage,
+        },
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || "Failed to process image");
+      }
+
+      // The response is the processed image with background removed
+      const blob = await response.blob();
+      const enhancedUrl = URL.createObjectURL(blob);
+      setEnhancedImageUrl(enhancedUrl);
       setIsProcessing(false);
       setShowResults(true);
 
@@ -79,12 +113,38 @@ const Home = () => {
       const completionMessage: Message = {
         id: Date.now().toString(),
         content:
-          "I've enhanced your image according to your instructions. You can view the results below and download the enhanced version.",
+          "I've removed the background from your image using Azure Computer Vision. You can view the results below and download the enhanced version.",
         sender: "ai",
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, completionMessage]);
-    }, 3000);
+    } catch (err) {
+      console.error("Error processing image:", err);
+      setIsProcessing(false);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "An error occurred while processing the image",
+      );
+
+      // Add error message to chat
+      const errorMessage: Message = {
+        id: Date.now().toString(),
+        content: `There was an error processing your image: ${err instanceof Error ? err.message : "Unknown error"}. Please check your Azure credentials and try again.`,
+        sender: "ai",
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    }
+  };
+
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = (error) => reject(error);
+    });
   };
 
   const handleDownload = () => {
@@ -93,7 +153,7 @@ const Home = () => {
     // Create a temporary anchor element to trigger the download
     const a = document.createElement("a");
     a.href = enhancedImageUrl;
-    a.download = "enhanced-image.jpg";
+    a.download = "background-removed.png";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -105,7 +165,15 @@ const Home = () => {
 
       <main className="container mx-auto py-8 px-4">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          <div className="space-y-6">
+          <div className="space-y-4">
+            <ApiCredentialsForm
+              apiKey={apiKey}
+              location={location}
+              endpoint={endpoint}
+              onApiKeyChange={setApiKey}
+              onLocationChange={setLocation}
+              onEndpointChange={setEndpoint}
+            />
             <ImageUploadArea
               onImageUpload={handleImageUpload}
               initialImage={uploadedImageUrl}
@@ -113,8 +181,13 @@ const Home = () => {
             <EnhanceButton
               onClick={handleEnhanceImage}
               isLoading={isProcessing}
-              isDisabled={!uploadedImage || messages.length <= 1}
+              isDisabled={!uploadedImage || !apiKey || !location || !endpoint}
             />
+            {error && (
+              <div className="p-3 bg-red-100 border border-red-300 text-red-700 rounded-md">
+                {error}
+              </div>
+            )}
           </div>
 
           <div>
@@ -128,7 +201,7 @@ const Home = () => {
 
         {isProcessing && (
           <div className="my-8">
-            <LoadingIndicator text="Enhancing your image with AI..." />
+            <LoadingIndicator text="Removing background with Azure Computer Vision..." />
           </div>
         )}
 
