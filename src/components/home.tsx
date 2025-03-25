@@ -1,32 +1,17 @@
 import React, { useState } from "react";
 import Header from "./Header";
 import ImageUploadArea from "./ImageUploadArea";
-import ChatInterface from "./ChatInterface";
+
 import EnhanceButton, { EnhanceType } from "./EnhanceButton";
 import ResultsDisplay from "./ResultsDisplay";
 import LoadingIndicator from "./LoadingIndicator";
 import ApiCredentialsForm from "./ApiCredentialsForm";
 
-interface Message {
-  id: string;
-  content: string;
-  sender: "user" | "ai";
-  timestamp: Date;
-}
-
 const Home = () => {
   const [uploadedImage, setUploadedImage] = useState<File | null>(null);
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string>("");
   const [enhancedImageUrl, setEnhancedImageUrl] = useState<string>("");
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "1",
-      content:
-        "Hello! Upload an image, enter your Azure Computer Vision credentials, and tell me how you'd like to enhance it. You can remove the background, make it black & white, or make it more colorful.",
-      sender: "ai",
-      timestamp: new Date(),
-    },
-  ]);
+
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [showResults, setShowResults] = useState<boolean>(false);
   const [apiKey, setApiKey] = useState<string>("");
@@ -48,29 +33,6 @@ const Home = () => {
     setActiveEnhanceType(null);
   };
 
-  const handleSendMessage = (message: string) => {
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      content: message,
-      sender: "user",
-      timestamp: new Date(),
-    };
-
-    setMessages((prev) => [...prev, newMessage]);
-
-    // Simulate AI response
-    setTimeout(() => {
-      const aiResponse: Message = {
-        id: (Date.now() + 1).toString(),
-        content:
-          "I understand what you want to do with your image. Click one of the enhancement buttons when you're ready to process your image.",
-        sender: "ai",
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, aiResponse]);
-    }, 1000);
-  };
-
   const getEnhancementEndpoint = (type: EnhanceType) => {
     switch (type) {
       case "background":
@@ -79,6 +41,8 @@ const Home = () => {
         return `${endpoint}/computervision/imageanalysis:analyze?api-version=2023-02-01-preview&features=smartCrops&smartCropsAspectRatios=1:1&modelVersion=latest`;
       case "colorful":
         return `${endpoint}/computervision/imageanalysis:analyze?api-version=2023-02-01-preview&features=smartCrops&smartCropsAspectRatios=1:1&modelVersion=latest`;
+      case "cartoon":
+        return `${endpoint}/computervision/imageanalysis:segment?api-version=2023-02-01-preview&mode=foregroundMatting`;
       default:
         return `${endpoint}/computervision/imageanalysis:segment?api-version=2023-02-01-preview&mode=backgroundRemoval`;
     }
@@ -92,6 +56,8 @@ const Home = () => {
         return "Converting to black & white with Azure Computer Vision...";
       case "colorful":
         return "Enhancing colors with Azure Computer Vision...";
+      case "cartoon":
+        return "Converting to cartoon with Azure Computer Vision...";
       default:
         return "Processing image with Azure Computer Vision...";
     }
@@ -100,13 +66,15 @@ const Home = () => {
   const getCompletionMessage = (type: EnhanceType) => {
     switch (type) {
       case "background":
-        return "I've removed the background from your image using Azure Computer Vision. You can view the results below and download the enhanced version.";
+        return "Background removed successfully using Azure Computer Vision.";
       case "blackwhite":
-        return "I've converted your image to black & white using Azure Computer Vision. You can view the results below and download the enhanced version.";
+        return "Image converted to black & white successfully.";
       case "colorful":
-        return "I've enhanced the colors in your image using Azure Computer Vision. You can view the results below and download the enhanced version.";
+        return "Colors enhanced successfully.";
+      case "cartoon":
+        return "Image converted to cartoon style successfully using Azure Computer Vision.";
       default:
-        return "I've processed your image using Azure Computer Vision. You can view the results below and download the enhanced version.";
+        return "Image processed successfully.";
     }
   };
 
@@ -118,9 +86,116 @@ const Home = () => {
         return "black-and-white.png";
       case "colorful":
         return "color-enhanced.png";
+      case "cartoon":
+        return "cartoon-style.png";
       default:
         return "enhanced-image.png";
     }
+  };
+
+  const processCartoon = async (file: File) => {
+    // Create a canvas to apply cartoon effect
+    const canvas = document.createElement("canvas");
+    const img = new Image();
+
+    return new Promise<Blob>((resolve, reject) => {
+      img.onload = () => {
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          reject(new Error("Could not get canvas context"));
+          return;
+        }
+
+        // Draw the original image
+        ctx.drawImage(img, 0, 0);
+
+        // Get the image data
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+
+        // Apply cartoon effect (edge detection and color quantization)
+        // First pass: edge detection
+        const edgeData = new Uint8ClampedArray(data.length);
+        for (let y = 1; y < canvas.height - 1; y++) {
+          for (let x = 1; x < canvas.width - 1; x++) {
+            const idx = (y * canvas.width + x) * 4;
+
+            // Simple Sobel edge detection
+            const idx1 = ((y - 1) * canvas.width + (x - 1)) * 4;
+            const idx2 = ((y - 1) * canvas.width + x) * 4;
+            const idx3 = ((y - 1) * canvas.width + (x + 1)) * 4;
+            const idx4 = (y * canvas.width + (x - 1)) * 4;
+            const idx5 = (y * canvas.width + (x + 1)) * 4;
+            const idx6 = ((y + 1) * canvas.width + (x - 1)) * 4;
+            const idx7 = ((y + 1) * canvas.width + x) * 4;
+            const idx8 = ((y + 1) * canvas.width + (x + 1)) * 4;
+
+            // Calculate gradient
+            const gx =
+              -1 * data[idx1] +
+              0 * data[idx2] +
+              1 * data[idx3] +
+              -2 * data[idx4] +
+              2 * data[idx5] +
+              -1 * data[idx6] +
+              0 * data[idx7] +
+              1 * data[idx8];
+
+            const gy =
+              -1 * data[idx1] +
+              -2 * data[idx2] +
+              -1 * data[idx3] +
+              0 * data[idx4] +
+              0 * data[idx5] +
+              1 * data[idx6] +
+              2 * data[idx7] +
+              1 * data[idx8];
+
+            const edge = Math.sqrt(gx * gx + gy * gy);
+
+            // Threshold the edge
+            edgeData[idx] =
+              edgeData[idx + 1] =
+              edgeData[idx + 2] =
+                edge > 80 ? 0 : 255;
+            edgeData[idx + 3] = 255;
+          }
+        }
+
+        // Second pass: color quantization and combine with edges
+        for (let i = 0; i < data.length; i += 4) {
+          // Quantize colors (reduce color palette)
+          data[i] = Math.round(data[i] / 40) * 40;
+          data[i + 1] = Math.round(data[i + 1] / 40) * 40;
+          data[i + 2] = Math.round(data[i + 2] / 40) * 40;
+
+          // Combine with edge detection
+          if (edgeData[i] === 0) {
+            data[i] = data[i + 1] = data[i + 2] = 0;
+          }
+        }
+
+        // Put the modified image data back on the canvas
+        ctx.putImageData(imageData, 0, 0);
+
+        // Convert canvas to blob
+        canvas.toBlob((blob) => {
+          if (blob) {
+            resolve(blob);
+          } else {
+            reject(new Error("Could not convert canvas to blob"));
+          }
+        }, "image/png");
+      };
+
+      img.onerror = () => {
+        reject(new Error("Could not load image"));
+      };
+
+      img.src = URL.createObjectURL(file);
+    });
   };
 
   const processBlackAndWhite = async (file: File) => {
@@ -331,6 +406,9 @@ const Home = () => {
       } else if (type === "colorful") {
         // Process colorful locally
         blob = await processColorful(uploadedImage);
+      } else if (type === "cartoon") {
+        // Process cartoon locally
+        blob = await processCartoon(uploadedImage);
       } else {
         throw new Error("Unknown enhancement type");
       }
@@ -340,14 +418,8 @@ const Home = () => {
       setIsProcessing(false);
       setShowResults(true);
 
-      // Add a message from AI about the completed enhancement
-      const completionMessage: Message = {
-        id: Date.now().toString(),
-        content: getCompletionMessage(type),
-        sender: "ai",
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, completionMessage]);
+      // Show success message or notification
+      console.log(getCompletionMessage(type));
     } catch (err) {
       console.error("Error processing image:", err);
       setIsProcessing(false);
@@ -357,14 +429,10 @@ const Home = () => {
           : "An error occurred while processing the image",
       );
 
-      // Add error message to chat
-      const errorMessage: Message = {
-        id: Date.now().toString(),
-        content: `There was an error processing your image: ${err instanceof Error ? err.message : "Unknown error"}. Please check your Azure credentials and try again.`,
-        sender: "ai",
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, errorMessage]);
+      // Show error message
+      console.error(
+        `Error: ${err instanceof Error ? err.message : "Unknown error"}. Please check your Azure credentials and try again.`,
+      );
       setActiveEnhanceType(null);
     }
   };
@@ -390,44 +458,56 @@ const Home = () => {
     document.body.removeChild(a);
   };
 
+  const handleCloseResults = () => {
+    setShowResults(false);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
 
       <main className="container mx-auto py-8 px-4">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          <div className="space-y-4">
-            <ApiCredentialsForm
-              apiKey={apiKey}
-              location={location}
-              endpoint={endpoint}
-              onApiKeyChange={setApiKey}
-              onLocationChange={setLocation}
-              onEndpointChange={setEndpoint}
-            />
+        <div className="max-w-4xl mx-auto space-y-6">
+          <ApiCredentialsForm
+            apiKey={apiKey}
+            location={location}
+            endpoint={endpoint}
+            onApiKeyChange={setApiKey}
+            onLocationChange={setLocation}
+            onEndpointChange={setEndpoint}
+          />
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <ImageUploadArea
               onImageUpload={handleImageUpload}
               initialImage={uploadedImageUrl}
             />
-            <EnhanceButton
-              onClick={handleEnhanceImage}
-              isLoading={isProcessing}
-              isDisabled={!uploadedImage || !apiKey || !location || !endpoint}
-              activeType={activeEnhanceType}
-            />
-            {error && (
-              <div className="p-3 bg-red-100 border border-red-300 text-red-700 rounded-md">
-                {error}
-              </div>
-            )}
-          </div>
 
-          <div>
-            <ChatInterface
-              onSendMessage={handleSendMessage}
-              messages={messages}
-              isLoading={isProcessing}
-            />
+            <div className="flex flex-col justify-between">
+              <div>
+                <h2 className="text-xl font-semibold mb-4">
+                  Enhance Your Image
+                </h2>
+                <p className="text-gray-600 mb-4">
+                  Select an enhancement option below:
+                </p>
+
+                <EnhanceButton
+                  onClick={handleEnhanceImage}
+                  isLoading={isProcessing}
+                  isDisabled={
+                    !uploadedImage || !apiKey || !location || !endpoint
+                  }
+                  activeType={activeEnhanceType}
+                />
+              </div>
+
+              {error && (
+                <div className="p-3 bg-red-100 border border-red-300 text-red-700 rounded-md mt-4">
+                  {error}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -449,6 +529,7 @@ const Home = () => {
               originalImage={uploadedImageUrl}
               enhancedImage={enhancedImageUrl}
               onDownload={handleDownload}
+              onClose={handleCloseResults}
             />
           </div>
         )}

@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Button } from "./ui/button";
 import { Eraser, Palette, ImageIcon } from "lucide-react";
 
-export type EnhanceType = "background" | "blackwhite" | "colorful";
+export type EnhanceType = "background" | "blackwhite" | "colorful" | "cartoon";
 
 interface EnhanceButtonProps {
   onClick?: (type: EnhanceType) => void;
@@ -40,6 +40,13 @@ const EnhanceButton = ({
       icon: Palette,
       color: "bg-indigo-600",
       hoverColor: "bg-indigo-500",
+    },
+    {
+      type: "cartoon" as EnhanceType,
+      label: "Make it Cartoon",
+      icon: ImageIcon,
+      color: "bg-purple-600",
+      hoverColor: "bg-purple-500",
     },
   ];
 

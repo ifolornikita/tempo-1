@@ -1,6 +1,13 @@
 import React from "react";
 import { Button } from "./ui/button";
-import { Download, ZoomIn, ZoomOut, ArrowLeft, ArrowRight } from "lucide-react";
+import {
+  Download,
+  ZoomIn,
+  ZoomOut,
+  ArrowLeft,
+  ArrowRight,
+  X,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ResultsDisplayProps {
@@ -8,6 +15,7 @@ interface ResultsDisplayProps {
   enhancedImage?: string;
   isLoading?: boolean;
   onDownload?: () => void;
+  onClose?: () => void;
 }
 
 const ResultsDisplay = ({
@@ -15,6 +23,7 @@ const ResultsDisplay = ({
   enhancedImage = "https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=800&q=80",
   isLoading = false,
   onDownload = () => console.log("Download clicked"),
+  onClose = () => console.log("Close clicked"),
 }: ResultsDisplayProps) => {
   const [zoomLevel, setZoomLevel] = React.useState(1);
   const [activeImage, setActiveImage] = React.useState<"original" | "enhanced">(
@@ -34,8 +43,18 @@ const ResultsDisplay = ({
   };
 
   return (
-    <div className="w-full max-w-6xl mx-auto p-6 bg-white rounded-lg shadow-md">
-      <h2 className="text-2xl font-bold mb-4 text-gray-800">Results</h2>
+    <div className="w-full max-w-6xl mx-auto p-6 bg-white rounded-lg shadow-md relative">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-2xl font-bold text-gray-800">Results</h2>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onClose}
+          className="absolute top-2 right-2"
+        >
+          <X size={18} />
+        </Button>
+      </div>
 
       {isLoading ? (
         <div className="flex items-center justify-center h-96 bg-gray-100 rounded-lg">
