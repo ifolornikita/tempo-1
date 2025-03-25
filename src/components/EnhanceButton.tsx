@@ -22,14 +22,14 @@ const EnhanceButton = ({
   const buttons = [
     {
       type: "background" as EnhanceType,
-      label: "Remove Background",
+      label: "Remove BG",
       icon: Eraser,
       color: "bg-primary",
       hoverColor: "bg-primary/90",
     },
     {
       type: "blackwhite" as EnhanceType,
-      label: "Make it Black & White",
+      label: "Black & White",
       icon: ImageIcon,
       color: "bg-gray-800",
       hoverColor: "bg-gray-700",
@@ -60,14 +60,14 @@ const EnhanceButton = ({
           return (
             <Button
               key={button.type}
-              size="lg"
-              className={`w-full h-[50px] text-base font-semibold transition-all duration-300 ${button.color} hover:${button.hoverColor} ${isButtonHovered ? "scale-105" : ""} ${isActive ? "ring-2 ring-offset-2 ring-blue-500" : ""}`}
+              size="sm"
+              className={`w-full h-[40px] text-xs font-semibold transition-all duration-300 ${button.color} hover:${button.hoverColor} ${isButtonHovered ? "scale-105" : ""} ${isActive ? "ring-2 ring-offset-2 ring-blue-500" : ""}`}
               onClick={() => onClick(button.type)}
               disabled={isDisabled || isLoading}
               onMouseEnter={() => setHovered(button.type)}
               onMouseLeave={() => setHovered(null)}
             >
-              <button.icon className="mr-2 h-5 w-5" />
+              <button.icon className="mr-2 h-4 w-4" />
               {isLoading && isActive ? "Processing..." : button.label}
             </Button>
           );
